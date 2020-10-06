@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Vibe Check</title>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css" integrity="sha384-9aIt2nRpC12Uk9gS9baDl411NQApFmC26EwAOH8WgZl5MYYxFfc+NcPb1dKGj7Sk" crossorigin="anonymous">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.js"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@2.8.0"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-colorschemes"></script>
+  <style type="text/css">
+    body {
+      background-color: lightblue;
+    }
+  </style>
+</head>
+<body>
+  <div class="col-md-10 offset-md-1" style="padding-top: 20px;">
+    <h3>Vibe Check</h3>
+    <h5> Heads up, currently pitcher rotation weirdness is not accounted for, so season graphs are inaccurate. </h5>
+    <p style="font-size:9pt; margin-bottom: 0px">This is best viewed on a wide screen.</p>
+    Team: <select name="teams" id="teams">
+    </select>
+    <div class="row" style="padding-top: 20px;">
+      <div id="graph" class="col-md-4" style="background-color: white; min-height: 500px;">
+        <div style="width: 100%; height: 700px;">
+          <canvas id="barChart"></canvas>
+        </div>
+      </div>
+      <div id="graph2" class="col-md-8" style="background-color: white; min-height: 500px;">
+        <div style="text-align: center">
+          Graph Type: <select name="graph-type" id="graph-type">
+            <option value="team-season">Team Season</option>
+            <option value="player-season">Player Season</option>
+            <option value="all-teams-season">All Teams Season</option>
+          </select>
+        </div>
+        <div id="playerChartContainer">
+          <div style="text-align: center">Click a player to show their line.</div>
+          <div style="width: 100%; height: 676px;">
+            <canvas id="playerLineChart"></canvas>
+          </div>
+        </div>
+        <div id="teamChartContainer" style="width: 100%; height: 700px;">
+          <canvas id="teamLineChart"></canvas>
+        </div>
+        <div id="allTeamsChartContainer" style="width: 100%; height: 676px;">
+          <div style="text-align: center">Click a team to show their line.</div>
+          <canvas id="allTeamsLineChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <script type="text/javascript">
+    var player_dict = {};
+    var team_dict = {}
+    var barChart;
+    var playerLineChart;
+    var teamLineChart;
+    var neg_yLabels = ["", "Less Than Ideal", "", "", "Far Less Than Ideal", "", "", "", "Honestly Terrible", "", "", ""];
+    var pos_yLabels = ["", "Quality", "", "", "Excellent", "", "", "", "Most Excellent", "", "", ""];
+
+    function showAllTeamsLineChart() {
+      var allTeamsLineChartData = {
+        labels: [...Array(100).keys()],
+        datasets: Object.keys(team_dict).map(function(team_id) {
+          if(team_id == "f02aeae2-5e6a-4098-9842-02d2273f25c7"){
+            team_color = "rgb(184, 139, 15)";
+          } else if (team_id == "eb67ae5e-c4bf-46ca-bbbc-425cd34182ff") {
+            team_color = "rgb(0, 176, 170)";
+          } else {
+            team_color = team_dict[team_id].color;
+          }
+          return {
+            label: team_dict[team_id].name,
+            fill: false,
+            hidden: true,
+            backgroundColor: team_color,
+            borderWidth: 1,
+            borderColor: team_color,
+            pointRadius: 0,
+            data: [...Array(100).keys()].map(function(day) {
+              const average = arr => arr.reduce( ( a, b ) => a + b, 0 ) / arr.length;
+              player_vibes = team_dict[team_id].hitters.concat(team_dict[team_id].pitchers[day%team_dict[team_id].pitchers.length]).map(function(player_id) {
+                var t = 6 + Math.round(10 * player_dict[player_id].b);
+                var n = Math.PI * (2 / t * day + .5);
+                return 5 * ((player_dict[player_id].p + player_dict[player_id].c) * Math.sin(n) - player_dict[player_id].p + player_dict[player_id].c);
+              });
+              return average(player_vibes);
+            })
+          };
+        })
+      };
+      var ctx = document.getElementById('allTeamsLineChart').getContext('2d');
+      allTeamsLineChart = new Chart(ctx, {
+        type: 'line',
+        data: allTeamsLineChartData,
+        options: {
+          scales: {
+            xAxes: [{
+              scaleLabel: {
+                display: true,
+                labelString: 'Day of Season',
+                fontSize: 15
+              },
+              ticks: {
+                stepSize: 5,
+                maxTicksLimit: 25,
+                suggestedMin: 0,
+                suggestedMax: 100
+              }
+            }],
+            yAxes: [{
+              ticks: {
+                callback: function(value, index, values) {
+                  if(value < 0) {
+                    return neg_yLabels[-value];
+                  } else {
+                    return pos_yLabels[value];
+                  }
+                },
+                stepSize: 1,
+                maxTicksLimit: 25,
+                suggestedMin: -6,
+                suggestedMax: 7.5
+              },
+            }]
+          },
+          title: {
+            display: true,
+            text: 'All Teams Season Vibes'
+          },
+          maintainAspectRatio: false,
+          responsive:true,
+        }
+      });
+    }
+
+    function showTeamLineChart(team) {
+      if(teamLineChart){
+        teamLineChart.destroy();
+      }
+      var teamLineChartData = {
+        labels: [...Array(100).keys()],
+        datasets: [{
+          label: "Team Vibe",
+          fill: false,
+          backgroundColor: "#000000",
+          borderWidth: 2,
+          borderColor: "#000000",
+          pointRadius: 0,
+          data: [...Array(100).keys()].map(function(day) {
+            const average = arr => arr.reduce( ( a, b ) => a + b, 0 ) / arr.length;
+            player_vibes = team_dict[team].hitters.concat(team_dict[team].pitchers[day%team_dict[team].pitchers.length]).map(function(player_id) {
+              var t = 6 + Math.round(10 * player_dict[player_id].b);
+              var n = Math.PI * (2 / t * day + .5);
+              return 5 * ((player_dict[player_id].p + player_dict[player_id].c) * Math.sin(n) - player_dict[player_id].p + player_dict[player_id].c);
+            });
+            return average(player_vibes);
+          })
+        }]
+      };
+      var ctx = document.getElementById('teamLineChart').getContext('2d');
+      teamLineChart = new Chart(ctx, {
+        type: 'line',
+        data: teamLineChartData,
+        options: {
+          scales: {
+            xAxes: [{
+              scaleLabel: {
+                display: true,
+                labelString: 'Day of Season',
+                fontSize: 15
+              },
+              ticks: {
+                stepSize: 5,
+                maxTicksLimit: 25,
+                suggestedMin: 0,
+                suggestedMax: 100
+              }
+            }],
+            yAxes: [{
+              ticks: {
+                callback: function(value, index, values) {
+                  if(value < 0) {
+                    return neg_yLabels[-value];
+                  } else {
+                    return pos_yLabels[value];
+                  }
+                },
+                stepSize: 1,
+                maxTicksLimit: 25,
+                suggestedMin: -8,
+                suggestedMax: 8
+              },
+            }]
+          },
+          title: {
+            display: true,
+            text: 'Team Season Vibes'
+          },
+          maintainAspectRatio: false,
+          responsive:true,
+        }
+      });
+    }
+
+    function showPlayerLineChar(team) {
+      if(playerLineChart){
+        playerLineChart.destroy();
+      }
+      var playerLineChartData = {
+        labels: [...Array(100).keys()],
+        datasets: team_dict[team].players.map(function(player_id) {
+            return  {
+                      label: player_dict[player_id].name,
+                      fill: false,
+                      hidden: true,
+                      borderWidth: 1,
+                      pointRadius: 0,
+                      data: [...Array(100).keys()].map(function(day) {
+                        var t = 6 + Math.round(10 * player_dict[player_id].b);
+                        var n = Math.PI * (2 / t * day + .5);
+                        return 5 * ((player_dict[player_id].p + player_dict[player_id].c) * Math.sin(n) - player_dict[player_id].p + player_dict[player_id].c);
+                      })
+                    };
+          })
+      };
+      var ctx = document.getElementById('playerLineChart').getContext('2d');
+      playerLineChart = new Chart(ctx, {
+        type: 'line',
+        data: playerLineChartData,
+        options: {
+          plugins: {
+            colorschemes: {
+              scheme: 'brewer.DarkTwo8'
+            }
+          },
+          scales: {
+            xAxes: [{
+              scaleLabel: {
+                display: true,
+                labelString: 'Day of Season',
+                fontSize: 15
+              },
+              ticks: {
+                stepSize: 5,
+                maxTicksLimit: 25,
+                suggestedMin: 0,
+                suggestedMax: 100
+              }
+            }],
+            yAxes: [{
+              ticks: {
+                callback: function(value, index, values) {
+                  if(value < 0) {
+                    return neg_yLabels[-value];
+                  } else {
+                    return pos_yLabels[value];
+                  }
+                },
+                stepSize: 1,
+                maxTicksLimit: 25,
+                suggestedMin: -10,
+                suggestedMax: 10
+              },
+            }]
+          },
+          title: {
+            display: true,
+            text: 'Player Season Vibes'
+          },
+          maintainAspectRatio: false,
+          responsive:true,
+        }
+      });
+    }
+
+    function showBarChart(team) {
+      if(barChart){
+        barChart.destroy();
+      }
+      var horizontalBarChartData = {
+        labels: team_dict[team].players.map(function(player_id) {
+          return player_dict[player_id].name;
+        }),
+        datasets: [{
+          label: 'Dataset 1',
+          backgroundColor: team_dict[team].color,
+          borderColor: '#000000',
+          borderWidth: 1,
+          data: team_dict[team].players.map(function(player_id) {
+            return -10*player_dict[player_id].p;
+          })
+        }, {
+          label: 'Dataset 2',
+          backgroundColor: team_dict[team].color,
+          borderColor: '#000000',
+          borderWidth: 1,
+          data: team_dict[team].players.map(function(player_id) {
+            return 10*player_dict[player_id].c;
+          })
+        }]
+      };
+      var ctx = document.getElementById('barChart').getContext('2d');
+      barChart = new Chart(ctx, {
+        type: 'horizontalBar',
+        data: horizontalBarChartData,
+        options: {
+          scales: {
+              xAxes: [{
+                  ticks: {
+                    callback: function(value, index, values) {
+                      if(value < 0) {
+                        return neg_yLabels[-value];
+                      } else {
+                        return pos_yLabels[value];
+                      }
+                    },
+                    stepSize: 1,
+                    maxTicksLimit: 25,
+                  },
+                  stacked: true
+              }],
+              yAxes: [{
+                  stacked: true
+              }]
+          },
+          tooltips: {
+            enabled: false
+          },
+          title: {
+            display: true,
+            text: 'Team Vibe Range'
+          },
+          legend: {
+            display: false
+          },
+          maintainAspectRatio: false,
+          responsive:true,
+        }
+      });
+    }
+
+    // What even is UI?
+    $("#graph-type").change(function() {
+      var type = $("#graph-type").val();
+      if(type == "player-season") {
+        $("#allTeamsChartContainer").hide();
+        $("#teamChartContainer").hide();
+        $("#playerChartContainer").show();
+      } else if(type == "team-season"){
+        $("#allTeamsChartContainer").hide();
+        $("#playerChartContainer").hide();
+        $("#teamChartContainer").show();
+      } else if(type == "all-teams-season"){
+        $("#playerChartContainer").hide();
+        $("#teamChartContainer").hide();
+        $("#allTeamsChartContainer").show();
+      }
+    });
+
+    // All the actual data fetch and main logic
+    const reducer = (accumulator, currentValue) => accumulator.concat(currentValue["data"]);
+    player_request = $.getJSON( "https://api.sibr.dev/chronicler/v1/players", function (data) {
+      data["data"].reduce(reducer, []).map(function(player) {
+        player_dict[player["id"]] = {
+          "name": player["name"],
+          "p": player["pressurization"],
+          "c": player["cinnamon"],
+          "b": player["buoyancy"]
+        };
+      });
+    });
+
+    team_request = $.getJSON( "https://api.sibr.dev/chronicler/v1/teams", function (data) {
+      data["data"].map(function(team) {
+        team_dict[team["data"]["id"]] = {
+          "players": team["data"]["lineup"].concat(team["data"]["rotation"]),
+          "pitchers": team["data"]["rotation"],
+          "hitters": team["data"]["lineup"],
+          "color": team["data"]["mainColor"],
+          "name": team["data"]["fullName"]
+        };
+        $("#teams").append($('<option value="' + team["data"]["id"] + '">' + team["data"]["fullName"] + '</option>'));
+      });
+    });
+
+    $.when(player_request, team_request).done(function(){
+      var team = $("#teams").val();
+      $("#playerChartContainer").hide();
+      $("#allTeamsChartContainer").hide();
+
+      $("#teams").change(function() {
+        team = $("#teams").val();
+        showBarChart(team);
+        showPlayerLineChar(team);
+        showTeamLineChart(team);
+        showAllTeamsLineChart();
+      });
+      showBarChart(team);
+      showPlayerLineChar(team);
+      showTeamLineChart(team);
+      showAllTeamsLineChart();
+    });
+
+
+  </script>
+</body>
+</html>
+
