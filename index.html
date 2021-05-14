@@ -377,14 +377,16 @@
 
     team_request = $.getJSON( "https://api.sibr.dev/chronicler/v1/teams", function (data) {
       data["data"].map(function(team) {
-        team_dict[team["data"]["id"]] = {
-          "players": team["data"]["lineup"].concat(team["data"]["rotation"]),
-          "pitchers": team["data"]["rotation"],
-          "hitters": team["data"]["lineup"],
-          "color": team["data"]["mainColor"],
-          "name": team["data"]["fullName"]
-        };
-        $("#teams").append($('<option value="' + team["data"]["id"] + '">' + team["data"]["fullName"] + '</option>'));
+        if(team["data"]["stadium"]){
+          team_dict[team["data"]["id"]] = {
+            "players": team["data"]["lineup"].concat(team["data"]["rotation"]),
+            "pitchers": team["data"]["rotation"],
+            "hitters": team["data"]["lineup"],
+            "color": team["data"]["mainColor"],
+            "name": team["data"]["fullName"]
+          };
+          $("#teams").append($('<option value="' + team["data"]["id"] + '">' + team["data"]["fullName"] + '</option>'));
+        }
       });
     });
 
