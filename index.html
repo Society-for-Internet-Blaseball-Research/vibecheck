@@ -65,16 +65,17 @@
     function showAllTeamsLineChart() {
       var allTeamsLineChartData = {
         labels: [...Array(100).keys()],
-        datasets: Object.keys(team_dict).map(function(team_id) {
-          if(team_id == "f02aeae2-5e6a-4098-9842-02d2273f25c7"){
+        datasets: Object.keys(team_dict).map(function(team) {
+          if(team == "f02aeae2-5e6a-4098-9842-02d2273f25c7"){
             team_color = "rgb(184, 139, 15)";
-          } else if (team_id == "eb67ae5e-c4bf-46ca-bbbc-425cd34182ff") {
+          } else if (team == "eb67ae5e-c4bf-46ca-bbbc-425cd34182ff") {
             team_color = "rgb(0, 176, 170)";
           } else {
-            team_color = team_dict[team_id].color;
+            team_color = team_dict[team].color;
           }
+          console.log(team_dict[team].name)
           return {
-            label: team_dict[team_id].name,
+            label: team_dict[team].name,
             fill: false,
             hidden: true,
             backgroundColor: team_color,
@@ -83,12 +84,12 @@
             pointRadius: 0,
             data: [...Array(100).keys()].map(function(day) {
               const average = arr => arr.reduce( ( a, b ) => a + b, 0 ) / arr.length;
-              player_vibes = team_dict[team_id].hitters.concat(team_dict[team_id].pitchers[day%team_dict[team_id].pitchers.length]).map(function(player_id) {
-                var t = 6 + Math.round(10 * player_dict[player_id].b);
-                var n = Math.PI * (2 / t * day + .5);
-                return 5 * ((player_dict[player_id].p + player_dict[player_id].c) * Math.sin(n) - player_dict[player_id].p + player_dict[player_id].c);
-              });
-              return average(player_vibes);
+                player_vibes = team_dict[team].players.map(function (player) {
+                  var t = 6 + Math.round(10 * player_dict[player.id].b.value);
+                  var n = Math.PI * (2 / t * day + .5);
+                  return 5 * ((player_dict[player.id].p.value + player_dict[player.id].c.value) * Math.sin(n) - player_dict[player.id].p.value + player_dict[player.id].c.value);
+                });
+                return average(player_vibes);
             })
           };
         })
@@ -153,10 +154,10 @@
           pointRadius: 0,
           data: [...Array(100).keys()].map(function(day) {
             const average = arr => arr.reduce( ( a, b ) => a + b, 0 ) / arr.length;
-            player_vibes = team_dict[team].hitters.concat(team_dict[team].pitchers[day%team_dict[team].pitchers.length]).map(function(player_id) {
-              var t = 6 + Math.round(10 * player_dict[player_id].b);
+            player_vibes = team_dict[team].players.map(function (player) {
+              var t = 6 + Math.round(10 * player_dict[player.id].b.value);
               var n = Math.PI * (2 / t * day + .5);
-              return 5 * ((player_dict[player_id].p + player_dict[player_id].c) * Math.sin(n) - player_dict[player_id].p + player_dict[player_id].c);
+              return 5 * ((player_dict[player.id].p.value + player_dict[player.id].c.value) * Math.sin(n) - player_dict[player.id].p.value + player_dict[player.id].c.value);
             });
             return average(player_vibes);
           })
@@ -213,17 +214,17 @@
       }
       var playerLineChartData = {
         labels: [...Array(100).keys()],
-        datasets: team_dict[team].players.map(function(player_id) {
+        datasets: team_dict[team].players.map(function(player) {
             return  {
-                      label: player_dict[player_id].name,
+                      label: player_dict[player.id].name,
                       fill: false,
                       hidden: true,
                       borderWidth: 1,
                       pointRadius: 0,
                       data: [...Array(100).keys()].map(function(day) {
-                        var t = 6 + Math.round(10 * player_dict[player_id].b);
+                        var t = 6 + Math.round(10 * player_dict[player.id].b.value);
                         var n = Math.PI * (2 / t * day + .5);
-                        return 5 * ((player_dict[player_id].p + player_dict[player_id].c) * Math.sin(n) - player_dict[player_id].p + player_dict[player_id].c);
+                        return 5 * ((player_dict[player.id].p.value + player_dict[player.id].c.value) * Math.sin(n) - player_dict[player.id].p.value + player_dict[player.id].c.value);
                       })
                     };
           })
@@ -283,24 +284,24 @@
         barChart.destroy();
       }
       var horizontalBarChartData = {
-        labels: team_dict[team].players.map(function(player_id) {
-          return player_dict[player_id].name;
+        labels: team_dict[team].players.map(function(player) {
+          return player_dict[player.id].name
         }),
         datasets: [{
           label: 'Dataset 1',
           backgroundColor: team_dict[team].color,
           borderColor: '#000000',
           borderWidth: 1,
-          data: team_dict[team].players.map(function(player_id) {
-            return -10*player_dict[player_id].p;
+          data: team_dict[team].players.map(function(player) {
+            return -10*player_dict[player.id].p.value;
           })
         }, {
           label: 'Dataset 2',
           backgroundColor: team_dict[team].color,
           borderColor: '#000000',
           borderWidth: 1,
-          data: team_dict[team].players.map(function(player_id) {
-            return 10*player_dict[player_id].c;
+          data: team_dict[team].players.map(function(player) {
+            return 10*player_dict[player.id].c.value;
           })
         }]
       };
@@ -363,30 +364,26 @@
     });
 
     // All the actual data fetch and main logic
-    const reducer = (accumulator, currentValue) => accumulator.concat(currentValue["data"]);
-    player_request = $.getJSON( "https://api.sibr.dev/chronicler/v1/players", function (data) {
-      data["data"].reduce(reducer, []).map(function(player) {
+    player_request = $.getJSON( "https://api2.sibr.dev/mirror/players", function (data) {
+      data.map(function(player) {
         player_dict[player["id"]] = {
           "name": player["name"],
-          "p": player["pressurization"],
-          "c": player["cinnamon"],
-          "b": player["buoyancy"]
+          "p": player["attributes"].find(({ name }) => name === "Survive"),
+          "c": player["attributes"].find(({ name }) => name === "Thrive"),
+          "b": player["attributes"].find(({ name }) => name === "Drama")
         };
       });
     });
 
-    team_request = $.getJSON( "https://api.sibr.dev/chronicler/v1/teams", function (data) {
-      data["data"].map(function(team) {
-        if(team["data"]["stadium"]){
-          team_dict[team["data"]["id"]] = {
-            "players": team["data"]["lineup"].concat(team["data"]["rotation"]),
-            "pitchers": team["data"]["rotation"],
-            "hitters": team["data"]["lineup"],
-            "color": team["data"]["mainColor"],
-            "name": team["data"]["fullName"]
+    team_request = $.getJSON( "https://api2.sibr.dev/mirror/teams", function (data) {
+      data.map(function(team) {
+          team_dict[team["id"]] = {
+            "players": team["roster"],
+            "color": team["primaryColor"],
+            "name": team["name"]
           };
-          $("#teams").append($('<option value="' + team["data"]["id"] + '">' + team["data"]["fullName"] + '</option>'));
-        }
+          $("#teams").append($('<option value="' + team["id"] + '">' + team["name"] + '</option>'));
+
       });
     });
 
