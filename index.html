@@ -368,9 +368,9 @@
       data.map(function(player) {
         player_dict[player["id"]] = {
           "name": player["name"],
-          "p": player["attributes"].find(({ name }) => name === "Survive"),
-          "c": player["attributes"].find(({ name }) => name === "Thrive"),
-          "b": player["attributes"].find(({ name }) => name === "Drama")
+          "p": player["attributes"].find(element => {return element.name == "Survive"}),
+          "c": player["attributes"].find(element => {return element.name == "Thrive"}),
+          "b": player["attributes"].find(element => {return element.name == "Drama"})
         };
       });
     });
